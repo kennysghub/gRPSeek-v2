@@ -3,6 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ProtoGrpcType } from '../proto/helloworld';
 import { GreeterHandlers } from '../proto/greeterPackage/Greeter';
+import { grpcRequestDuration, grpcRequestsTotal, grpcResponseLatency } from '../metrics/metrics';
 
 const PORT = 8082;
 const PROTO_FILE = '../proto/helloworld.proto';
@@ -29,7 +30,12 @@ function getServer(){
 
   server.addService(greeterPackage.Greeter.service, {
     SayHello: (req, res) => {
-      // console.log("Server received request: ", req.request);
+      grpcRequestsTotal.inc();
+      // Start timer 
+      console.log(grpcRequestsTotal)
+      const timer = grpcRequestDuration.startTimer();
+      timer();
+      console.log(timer())
       res(null, {message: "Hello from server"})
     }
   } as GreeterHandlers);
