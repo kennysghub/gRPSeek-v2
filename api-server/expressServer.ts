@@ -2,12 +2,11 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as client from 'prom-client';
-import '../metrics/metrics'
+import '../metrics/metrics';
 
 const app = express();
 app.use(cors());
 const PORT = 3000;
-
 
 
 app.get('/metrics', async (req,res)=> {

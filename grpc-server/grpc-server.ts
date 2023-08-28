@@ -29,14 +29,13 @@ function getServer(){
   const server = new grpc.Server();
 
   server.addService(greeterPackage.Greeter.service, {
-    SayHello: (req, res) => {
+    SayHello:  (call, callback) => {
       grpcRequestsTotal.inc();
       // Start timer 
-      console.log(grpcRequestsTotal)
-      const timer = grpcRequestDuration.startTimer();
+      const timer =  grpcRequestDuration.startTimer();
       timer();
       console.log(timer())
-      res(null, {message: "Hello from server"})
+      callback(null, {message: "Hello from server"})
     }
   } as GreeterHandlers);
 
