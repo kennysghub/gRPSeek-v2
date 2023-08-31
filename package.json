@@ -12,7 +12,8 @@
     "apiServer": "ts-node ./api-server/expressServer",
     "lint": "eslint --fix \"./src/**/*.{js,jsx,ts,tsx,json}\"",
     "format": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
-    "proto:gen": "./tools/proto-gen.sh"
+    "proto:gen": "./tools/proto-gen.sh",
+    "arielServer": "ts-node ./server/server.ts"
   },
   "keywords": [],
   "author": "",

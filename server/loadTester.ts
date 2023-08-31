@@ -2,7 +2,9 @@ import * as grpc from '@grpc/grpc-js';
 import { performance } from 'perf_hooks';
 import * as fs from 'fs';
 import * as path from 'path';
-
+// TimeScale DB Setup 
+import {sequelize} from '../api-server/expressServer'
+import {QueryTypes} from 'sequelize'
 /** Interceptor for client node server
  * For every request it calculates the length it took and status code
  * WiP: Using requestors to check status code of request
@@ -22,8 +24,22 @@ function clientInterceptor(): grpc.Interceptor {
 
     //duration in ms
     let timeDuration = endTime - startTime;
+    // console.log("Time Duration: ", timeDuration);
+    console.log(path.join(__dirname,'../metrics/time.txt'))
     fs.writeFileSync(path.join(__dirname, '../metrics/time.txt'), `Time Duration: ${timeDuration}\n`, { flag: "a+" });
-    console.log('this is the call: ', call);
+    // Insert metrics into Timescale DB
+    // sequelize.query(`
+    //     INSERT INTO metrics(time, latency) VALUES($1, $2)
+    //   `, {
+    //     bind: [new Date(), timeDuration],
+    //     type: QueryTypes.INSERT  // Use imported QueryTypes
+    //   }).then(() => {
+    //     console.log('Metric inserted into TimescaleDB');
+    //   }).catch(err => {
+    //     console.log('Error inserting metric:', err);
+    //   });
+
+    // console.log('this is the call: ', call);
     return call;
   }
 }
