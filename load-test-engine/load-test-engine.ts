@@ -107,4 +107,7 @@ class LoadTestEngine {
 
 }
 
-module.exports = new LoadTestEngine();
+// module.exports = new LoadTestEngine();
+// export const loadTestEngineInstance = new LoadTestEngine();
+const engine = new LoadTestEngine();
+export default engine;
