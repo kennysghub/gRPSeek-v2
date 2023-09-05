@@ -1,24 +1,31 @@
 const hash = require('crypto');
 
+interface Message {
+  [key: string]: string | number | boolean;
+}
+type StubFunction = (message: Message & { [key: string]: any }) => any;
+
+type stub = {
+  stub: (arg: any) => any,
+  message: Message,
+  interval: number,
+  timeout: NodeJS.Timeout | undefined,
+}
+
 // Generates a label if one is not provided by user
-function hashCall(stub, message, interval) {
+function hashCall(stub:StubFunction, message:Message, interval:number) {
   return hash.createHash('sha256')
     .update(stub.toString() + JSON.stringify(message) + interval.toString())
     .digest('hex');
 }
 
 // Recursive setTimeout for repeating calls
-function repeatCall(call) {
+function repeatCall(call: stub) {
   call.stub(call.message);
   call.timeout = setTimeout(() => {repeatCall(call)}, call.interval);
 }
 
-type stub = {
-  stub: (arg: any) => any,
-  message: Record<string, any>,
-  interval: number,
-  timeout: NodeJS.Timeout | undefined,
-}
+
 
 class LoadTestEngine {
   private calls: Record<string, stub>
@@ -29,7 +36,7 @@ class LoadTestEngine {
     this.active = {};
   }
 
-  addCall(stub: (arg: any) => any, message: Record<string, any>, interval: number, label: string = hashCall(stub, message, interval), timeout: NodeJS.Timeout | undefined): LoadTestEngine {
+  addCall(stub: StubFunction, message: Message, interval: number, label: string = hashCall(stub, message, interval), timeout?: NodeJS.Timeout): LoadTestEngine {
     if (this.calls[label]) {
       throw new Error('Label already exists.');
     }
@@ -43,7 +50,7 @@ class LoadTestEngine {
     return this;
   }
 
-  removeCall(label): LoadTestEngine {
+  removeCall(label:string): LoadTestEngine {
     if (this.calls[label]) {
       delete this.calls[label];
       console.log(`Call ${label} removed`);

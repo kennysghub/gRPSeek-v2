@@ -3,7 +3,7 @@ import { performance } from 'perf_hooks';
 import * as fs from 'fs';
 import * as path from 'path';
 // TimeScale DB Setup 
-import engine from '../load-test-engine/load-test-engine.ts';
+import engine from '../load-test-engine/load-test-engine';
 
 /** Interceptor for client node server
  * For every request it calculates the length it took and status code
