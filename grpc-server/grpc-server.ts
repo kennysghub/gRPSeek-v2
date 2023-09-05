@@ -28,17 +28,13 @@ function getServer() {
   const server = new grpc.Server();
 
   server.addService(greeterPackage.Greeter.service, {
-    SayHello:  (call, callback) => {
-      grpcRequestsTotal.inc();
-      // Start timer 
-      const timer =  grpcRequestDuration.startTimer();
-      timer();
-      console.log(timer())
+    SayHello: (req, res) => {
+      // console.log("Server received request: ", req.request);
       let value = Math.floor(Math.random() * 10);
       if (value < 2) {
         res({ code: grpc.status.INVALID_ARGUMENT, message: "Invalid arg from server" })
       } else {
-        callback(null, { message: "Hello from server" })
+        res(null, { message: "Hello from server" })
       }
     }
   } as GreeterHandlers);
