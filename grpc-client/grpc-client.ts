@@ -3,7 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ProtoGrpcType } from '../proto/helloworld';
 import MetricInterceptor from '../server/loadTester';
-
+import engine from '../load-test-engine/load-test-engine';
 const PORT = 8082;
 const PROTO = '../proto/helloworld.proto';
 
@@ -21,24 +21,37 @@ function main() {
   client.SayHello({ name: "Kenny" }, { interceptors: [clientInterceptor.interceptor] }, (err, res) => {
     if (err) {
       console.log('error', err)
-      return;
+    }else{
+
+       console.log("result:", res)
     }
-    console.log("result:", res)
   })
 }
 
-let counter = 0;
-let copy = function () {
-  counter++;
-  if (counter < 100) {
-    setTimeout(() => { copy() }, 1);
-  }
-  main();
-}
 
-copy();
+engine.addCall(main,{name:"Kenny"},1000, "This da client", clientInterceptor,undefined);
+engine.start(["This da client"])
 
-setTimeout(() => {
-  console.log('Finished calls: ', clientInterceptor.numCalls);
-  console.log('Number of failed requests: ', clientInterceptor.numErrors);
-}, 1000);
+
+
+
+
+
+
+
+
+// let counter = 0;
+// let copy = function () {
+//   counter++;
+//   if (counter < 100) {
+//     setTimeout(() => { copy() }, 1);
+//   }
+//   main();
+// }
+
+// copy();
+
+// setTimeout(() => {
+//   console.log('Finished calls: ', clientInterceptor.numCalls);
+//   console.log('Number of failed requests: ', clientInterceptor.numErrors);
+// }, 1000);

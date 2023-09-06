@@ -1,3 +1,4 @@
+import MetricInterceptor from '../server/loadTester';
 const hash = require('crypto');
 
 interface Message {
@@ -9,6 +10,7 @@ type stub = {
   stub: (arg: any) => any,
   message: Message,
   interval: number,
+  interceptor: MetricInterceptor
   timeout: NodeJS.Timeout | undefined,
 }
 
@@ -36,7 +38,7 @@ class LoadTestEngine {
     this.active = {};
   }
 
-  addCall(stub: StubFunction, message: Message, interval: number, label: string = hashCall(stub, message, interval), timeout?: NodeJS.Timeout): LoadTestEngine {
+  addCall(stub: StubFunction, message: Message, interval: number, label: string = hashCall(stub, message, interval), interceptor:MetricInterceptor, timeout?: NodeJS.Timeout): LoadTestEngine {
     if (this.calls[label]) {
       throw new Error('Label already exists.');
     }
