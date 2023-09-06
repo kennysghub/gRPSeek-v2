@@ -11,26 +11,35 @@ const packageDef = protoLoader.loadSync(path.resolve(__dirname, PROTO));
 const grpcObj = (grpc.loadPackageDefinition(packageDef) as unknown) as ProtoGrpcType;
 const greeterPackage = grpcObj.greeterPackage;
 
-const client = new grpcObj.greeterPackage.Greeter(
-  `0.0.0.0:${PORT}`, grpc.credentials.createInsecure(),
-)
 
 let clientInterceptor = new MetricInterceptor();
 
-function main() {
-  client.SayHello({ name: "Kenny" }, { interceptors: [clientInterceptor.interceptor] }, (err, res) => {
-    if (err) {
-      console.log('error', err)
-    }else{
+// function main() {
+//   client.SayHello({ name: "Kenny" }, { interceptors: [clientInterceptor.interceptor] },  (err, res) => {
+//     if (err) {
+//       console.log('error', err)
+//     }else{
+      
+//        console.log("result:", res)
+//     }
+//   })
+// }
 
-       console.log("result:", res)
+const client = new grpcObj.greeterPackage.Greeter(
+  `0.0.0.0:${PORT}`, grpc.credentials.createInsecure(),
+);
+const makeCall = () => {
+  client.SayHello({ name: "Kenny" }, { interceptors: [clientInterceptor.interceptor] },  (err, res) => {
+    if (err) {
+      console.log('error', err);
+    } else {
+      console.log("result:", res);
     }
-  })
+  });
 }
 
-
-engine.addCall(main,{name:"Kenny"},1000, "This da client", clientInterceptor,undefined);
-engine.start(["This da client"])
+engine.addCall(client.SayHello,{name:"Meow"},1000, "TheCall", clientInterceptor);
+engine.start(["TheCall"])
 
 
 

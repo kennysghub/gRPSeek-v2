@@ -4,10 +4,11 @@ const hash = require('crypto');
 interface Message {
   [key: string]: string | number | boolean;
 }
-type StubFunction = (message: Message & { [key: string]: any }) => any;
+// Added optional `options` parameter which will be used for passing the interceptor options
+type StubFunction = (message: Message & { [key: string]: any }, options?:any) => any;
 
 type stub = {
-  stub: (arg: any) => any,
+  stub: StubFunction
   message: Message,
   interval: number,
   interceptor: MetricInterceptor
@@ -23,13 +24,17 @@ function hashCall(stub:StubFunction, message:Message, interval:number) {
 
 // Recursive setTimeout for repeating calls
 function repeatCall(call: stub) {
-  call.stub(call.message);
+  console.log("call: ", call)
+  call.stub(call.message, {interceptors: [call.interceptor.interceptor] });
   call.timeout = setTimeout(() => {repeatCall(call)}, call.interval);
 }
 
 
 
 class LoadTestEngine {
+  /**
+   * Record is a utility type that constructs an object type whose property keys are `K` and corresponding values are `T`. The syntax is  `Record<Keys, Type>`. In this case, Record<string, stub> means an object where each property key is a `string` and value is of type `stub`. These are objects wehre each key is a string(label for a call) and each value is a stub object containing the details for that call. 
+   */
   private calls: Record<string, stub>
   private active: Record<string, stub>
   
@@ -41,11 +46,12 @@ class LoadTestEngine {
   addCall(stub: StubFunction, message: Message, interval: number, label: string = hashCall(stub, message, interval), interceptor:MetricInterceptor, timeout?: NodeJS.Timeout): LoadTestEngine {
     if (this.calls[label]) {
       throw new Error('Label already exists.');
-    }
+    };
     this.calls[label] = {
       stub,
       message,
       interval,
+      interceptor,
       timeout
     }
     console.log(`Call ${label} added.`);

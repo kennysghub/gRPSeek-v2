@@ -28,6 +28,7 @@ class MetricInterceptor implements MetricInterceptorInterface {
       //start method called before an outbound call has started. This is where to define listener and methods that occur with inbound operations
       start: (metadata, listener, next) => {
         //listener that intercepts inbound operations - receiving server status and message
+        
         let newListener: grpc.Listener = {
           onReceiveMessage: (message, next) => {
             console.log('inbound message received: ', message);

@@ -1,3 +1,5 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var hash = require('crypto');
 // Generates a label if one is not provided by user
 function hashCall(stub, message, interval) {
@@ -7,7 +9,7 @@ function hashCall(stub, message, interval) {
 }
 // Recursive setTimeout for repeating calls
 function repeatCall(call) {
-    call.stub(call.message);
+    call.stub(call.message, { interceptors: [call.interceptor.interceptor] });
     call.timeout = setTimeout(function () { repeatCall(call); }, call.interval);
 }
 var LoadTestEngine = /** @class */ (function () {
@@ -15,15 +17,17 @@ var LoadTestEngine = /** @class */ (function () {
         this.calls = {};
         this.active = {};
     }
-    LoadTestEngine.prototype.addCall = function (stub, message, interval, label, timeout) {
+    LoadTestEngine.prototype.addCall = function (stub, message, interval, label, interceptor, timeout) {
         if (label === void 0) { label = hashCall(stub, message, interval); }
         if (this.calls[label]) {
             throw new Error('Label already exists.');
         }
+        ;
         this.calls[label] = {
             stub: stub,
             message: message,
             interval: interval,
+            interceptor: interceptor,
             timeout: timeout
         };
         console.log("Call ".concat(label, " added."));
@@ -89,4 +93,7 @@ var LoadTestEngine = /** @class */ (function () {
     };
     return LoadTestEngine;
 }());
-module.exports = new LoadTestEngine();
+// module.exports = new LoadTestEngine();
+// export const loadTestEngineInstance = new LoadTestEngine();
+var engine = new LoadTestEngine();
+exports.default = engine;
