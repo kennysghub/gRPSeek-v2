@@ -1,55 +1,163 @@
 const hash = require('crypto');
+import MetricInterceptor from '../server/loadTester';
+import * as grpc from '@grpc/grpc-js';
+import * as path from 'path';
+import * as protoLoader from '@grpc/proto-loader';
+import { ProtoGrpcType } from '../proto/helloworld';
 
+import fs from 'fs';
+let clientInterceptor = new MetricInterceptor();
+export const options = { interceptors: [clientInterceptor.interceptor] };
 // Generates a label if one is not provided by user
-function hashCall(stub, message, interval) {
-  return hash.createHash('sha256')
+function hashCall(stub: Stub, message: Message, interval: number) {
+  return hash
+    .createHash('sha256')
     .update(stub.toString() + JSON.stringify(message) + interval.toString())
     .digest('hex');
 }
 
 // Recursive setTimeout for repeating calls
-function repeatCall(call) {
-  call.stub(call.message);
-  call.timeout = setTimeout(() => {repeatCall(call)}, call.interval);
+function repeatCall(call: Call) {
+  // Type issue with grpc.CallOptions, temporarily disabling call count limit
+  // if (
+  //   call.options.interceptors !== undefined &&
+  //   call.count >= options.interceptors.length
+  // ) {
+  //   console.log('Clearing timeout');
+  //   clearTimeout(call.timeout);
+  //   return;
+  // }
+  console.log('this.latencyData:5 ', clientInterceptor.latencyData);
+
+  // console.log("call.timeout: ", call.timeout)
+  if (typeof call.stub === 'function') {
+    const instance = new (call.stub as any).constructor();
+
+    instance(call.message, call.options, call.callback);
+  }
+  call.stub(call.message, call.options, call.callback);
+  call.timeout = setTimeout(() => {
+    repeatCall(call);
+  }, call.interval);
+  console.log('Prototype of call.stub:', Object.getPrototypeOf(call.stub));
 }
 
-type stub = {
-  stub: (arg: any) => any,
-  message: Record<string, any>,
-  interval: number,
-  timeout: NodeJS.Timeout | undefined,
-}
+type Stub = (
+  message: Message,
+  options: grpc.CallOptions,
+  callback: grpc.requestCallback<any>
+) => any;
 
-class LoadTestEngine {
-  private calls: Record<string, stub>
-  private active: Record<string, stub>
-  
-  constructor() {
+type Message = Record<string, string | number | boolean>;
+
+type Call = {
+  stub: Stub;
+  message: Message;
+  options: grpc.CallOptions;
+  callback: grpc.requestCallback<any>;
+  interval: number;
+  count: number;
+  timeout: NodeJS.Timeout | undefined;
+};
+export interface LoadTestConfig {
+  duration: number;
+  protoPath?: string;
+  serviceName?: string;
+  methodName?: string;
+  payloadPath?: string;
+  callbackPath?: string;
+  packageName?: string;
+}
+export class LoadTestEngine {
+  private calls: Record<string, Call>;
+  private active: Record<string, Call>;
+  public config: LoadTestConfig;
+
+  constructor(config: LoadTestConfig) {
+    this.config = config;
     this.calls = {};
     this.active = {};
+    if (config.protoPath && config.serviceName && config.methodName) {
+      this.setupGrpcClient();
+    }
   }
+  public setupGrpcClient() {
+    const packageDef = protoLoader.loadSync(
+      path.resolve(__dirname, this.config.protoPath)
+    );
+    const grpcObj = grpc.loadPackageDefinition(
+      packageDef
+    ) as unknown as ProtoGrpcType;
 
-  addCall(stub: (arg: any) => any, message: Record<string, any>, interval: number, label: string = hashCall(stub, message, interval), timeout: NodeJS.Timeout | undefined): LoadTestEngine {
+    const Pkg = grpcObj[this.config.packageName];
+
+    if (!Pkg) {
+      throw new Error(
+        `Service "${this.config.serviceName}" not found in the loaded .proto file.`
+      );
+    }
+  }
+  // Overload signatures
+  addCall(
+    stub: Stub,
+    message: Message,
+    options: grpc.CallOptions,
+    callback: grpc.requestCallback<any>,
+    interval: number
+  ): LoadTestEngine;
+  addCall(
+    stub: Stub,
+    message: Message,
+    options: grpc.CallOptions,
+    callback: grpc.requestCallback<any>,
+    interval: number,
+    count: number,
+    label: string,
+    timeout: NodeJS.Timeout
+  ): LoadTestEngine;
+
+  addCall(
+    stub: Stub,
+    message: Message,
+    options: grpc.CallOptions,
+    callback: grpc.requestCallback<any>,
+    interval: number,
+    count?: number,
+    label?: string,
+    timeout?: NodeJS.Timeout
+  ): LoadTestEngine {
     if (this.calls[label]) {
       throw new Error('Label already exists.');
+    }
+    if (arguments.length < 8) {
+      timeout = undefined;
+    }
+    if (arguments.length < 7) {
+      label = hashCall(stub, message, interval);
+    }
+    if (arguments.length < 6) {
+      count = Infinity;
     }
     this.calls[label] = {
       stub,
       message,
+      options,
+      callback,
       interval,
-      timeout
-    }
+      count,
+      timeout,
+    };
     console.log(`Call ${label} added.`);
     return this;
   }
 
-  removeCall(label): LoadTestEngine {
+  removeCall(label: string): LoadTestEngine {
     if (this.calls[label]) {
       delete this.calls[label];
       console.log(`Call ${label} removed`);
       return this;
     } else {
-      throw new Error('Label does not exist.')
+      throw new Error('Label does not exist.');
     }
   }
 
@@ -69,7 +177,7 @@ class LoadTestEngine {
         // Add to active calls tracker
         this.active[label] = call;
       }
-    })
+    });
   }
 
   startAll(): void {
@@ -89,14 +197,15 @@ class LoadTestEngine {
       clearTimeout(this.active[label].timeout);
       delete this.active[label];
       console.log(`Call ${label} stopped.`);
-    })
+    });
   }
 
   stopAll(): void {
     if (!Object.keys(this.active).length) {
-      throw new Error('No active calls.')
+      // throw new Error('No active calls.');
+      console.log('No active calls');
     }
-  
+
     for (const label in this.active) {
       clearTimeout(this.active[label].timeout);
       delete this.active[label];
@@ -105,6 +214,17 @@ class LoadTestEngine {
     console.log('All active calls stopped.');
   }
 
+  public run() {
+    this.startAll();
+    setTimeout(() => {
+      console.log('OPTIONS:kenlog ', options);
+      console.log('this.latencyData:1 ', clientInterceptor.latencyData);
+
+      this.stopAll();
+      console.log('this.latencyData:2 ', clientInterceptor.latencyData);
+    }, this.config.duration * 1000);
+  }
 }
 
-module.exports = new LoadTestEngine();
+// module.exports = new LoadTestEngine();
+export const loadTestEngineInstance = new LoadTestEngine({ duration: 25000 }); // example duration

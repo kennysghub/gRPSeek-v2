@@ -1,30 +1,107 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.loadTestEngineInstance = exports.LoadTestEngine = exports.options = void 0;
 var hash = require('crypto');
+var loadTester_1 = __importDefault(require("../server/loadTester"));
+var grpc = __importStar(require("@grpc/grpc-js"));
+var path = __importStar(require("path"));
+var protoLoader = __importStar(require("@grpc/proto-loader"));
+var clientInterceptor = new loadTester_1.default();
+exports.options = { interceptors: [clientInterceptor.interceptor] };
 // Generates a label if one is not provided by user
 function hashCall(stub, message, interval) {
-    return hash.createHash('sha256')
+    return hash
+        .createHash('sha256')
         .update(stub.toString() + JSON.stringify(message) + interval.toString())
         .digest('hex');
 }
 // Recursive setTimeout for repeating calls
 function repeatCall(call) {
-    call.stub(call.message);
-    call.timeout = setTimeout(function () { repeatCall(call); }, call.interval);
+    // Type issue with grpc.CallOptions, temporarily disabling call count limit
+    // if (
+    //   call.options.interceptors !== undefined &&
+    //   call.count >= options.interceptors.length
+    // ) {
+    //   console.log('Clearing timeout');
+    //   clearTimeout(call.timeout);
+    //   return;
+    // }
+    console.log('this.latencyData:5 ', clientInterceptor.latencyData);
+    // console.log("call.timeout: ", call.timeout)
+    if (typeof call.stub === 'function') {
+        var instance = new call.stub.constructor();
+        instance(call.message, call.options, call.callback);
+    }
+    call.stub(call.message, call.options, call.callback);
+    call.timeout = setTimeout(function () {
+        repeatCall(call);
+    }, call.interval);
+    console.log('Prototype of call.stub:', Object.getPrototypeOf(call.stub));
 }
 var LoadTestEngine = /** @class */ (function () {
-    function LoadTestEngine() {
+    function LoadTestEngine(config) {
+        this.config = config;
         this.calls = {};
         this.active = {};
+        if (config.protoPath && config.serviceName && config.methodName) {
+            this.setupGrpcClient();
+        }
     }
-    LoadTestEngine.prototype.addCall = function (stub, message, interval, label, timeout) {
-        if (label === void 0) { label = hashCall(stub, message, interval); }
+    LoadTestEngine.prototype.setupGrpcClient = function () {
+        var packageDef = protoLoader.loadSync(path.resolve(__dirname, this.config.protoPath));
+        var grpcObj = grpc.loadPackageDefinition(packageDef);
+        var Pkg = grpcObj[this.config.packageName];
+        if (!Pkg) {
+            throw new Error("Service \"".concat(this.config.serviceName, "\" not found in the loaded .proto file."));
+        }
+    };
+    LoadTestEngine.prototype.addCall = function (stub, message, options, callback, interval, count, label, timeout) {
         if (this.calls[label]) {
             throw new Error('Label already exists.');
+        }
+        if (arguments.length < 8) {
+            timeout = undefined;
+        }
+        if (arguments.length < 7) {
+            label = hashCall(stub, message, interval);
+        }
+        if (arguments.length < 6) {
+            count = Infinity;
         }
         this.calls[label] = {
             stub: stub,
             message: message,
+            options: options,
+            callback: callback,
             interval: interval,
-            timeout: timeout
+            count: count,
+            timeout: timeout,
         };
         console.log("Call ".concat(label, " added."));
         return this;
@@ -78,7 +155,8 @@ var LoadTestEngine = /** @class */ (function () {
     };
     LoadTestEngine.prototype.stopAll = function () {
         if (!Object.keys(this.active).length) {
-            throw new Error('No active calls.');
+            // throw new Error('No active calls.');
+            console.log('No active calls');
         }
         for (var label in this.active) {
             clearTimeout(this.active[label].timeout);
@@ -87,6 +165,18 @@ var LoadTestEngine = /** @class */ (function () {
         }
         console.log('All active calls stopped.');
     };
+    LoadTestEngine.prototype.run = function () {
+        var _this = this;
+        this.startAll();
+        setTimeout(function () {
+            console.log('OPTIONS:kenlog ', exports.options);
+            console.log('this.latencyData:1 ', clientInterceptor.latencyData);
+            _this.stopAll();
+            console.log('this.latencyData:2 ', clientInterceptor.latencyData);
+        }, this.config.duration * 1000);
+    };
     return LoadTestEngine;
 }());
-module.exports = new LoadTestEngine();
+exports.LoadTestEngine = LoadTestEngine;
+// module.exports = new LoadTestEngine();
+exports.loadTestEngineInstance = new LoadTestEngine({ duration: 25000 }); // example duration
