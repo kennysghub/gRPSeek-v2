@@ -32,37 +32,26 @@ var MetricInterceptor = /** @class */ (function () {
         this.interceptor = function (options, nextCall) {
             var startTime;
             var endTime;
-            //create a requestor intercepts outbound operations (start, sendMessage)
+            // Create a requestor intercepts outbound operations (start, sendMessage)
             var requestor = {
-                //start method called before an outbound call has started. This is where to define listener and methods that occur with inbound operations
+                // Start method called before an outbound call has started. This is where to define listener and methods that occur with inbound operations
                 start: function (metadata, listener, next) {
-                    //listener that intercepts inbound operations - receiving server status and message
+                    // Listener that intercepts inbound operations - receiving server status and message
                     var newListener = {
                         onReceiveMessage: function (message, next) {
-                            console.log('inbound message received: ', message);
+                            // console.log('inbound message received: ', message);
                             var endTime = perf_hooks_1.performance.now();
                             var timeDuration = endTime - startTime;
-                            //duration in ms
-                            // fs.writeFileSync(
-                            //   path.join(__dirname, '../metrics/time.txt'),
-                            //   `Request number ${this.numCalls}:, Time Duration: ${timeDuration}\n`,
-                            //   { flag: 'a+' }
-                            // );
                             _this.latencyData.push({
                                 requestNumber: _this.numCalls,
                                 latency: timeDuration,
                             });
-                            // Check if all interceptors are done
-                            // if (this.numCalls >= 10) {
-                            //   generateHTML(this.latencyData);
-                            // }
                             next(message);
                         },
                         onReceiveStatus: function (status, next) {
                             if (status.code !== grpc.status.OK) {
                                 _this.numErrors++;
                                 console.log("status error: ".concat(grpc.status[status.code], " message: ").concat(status.details, ", ").concat(_this.numErrors, ", ").concat(_this.numCalls));
-                                //   Potential Stretch feature: handling failed requests with a fallback method
                             }
                             next(status);
                         },

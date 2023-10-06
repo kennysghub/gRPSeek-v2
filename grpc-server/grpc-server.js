@@ -27,7 +27,8 @@ var path = __importStar(require("path"));
 var grpc = __importStar(require("@grpc/grpc-js"));
 var protoLoader = __importStar(require("@grpc/proto-loader"));
 var grpc_server_reflection_1 = require("grpc-server-reflection");
-var PORT = 8082;
+var numCalls = 0;
+var PORT = 50051;
 var PROTO_FILE = '../proto/helloworld.proto';
 var packageDef = protoLoader.loadSync(path.resolve(__dirname, PROTO_FILE));
 var grpcObj = grpc.loadPackageDefinition(packageDef);
@@ -51,6 +52,7 @@ function getServer() {
     server.addService(greeterPackage.Greeter.service, {
         SayHello: function (call, callback) {
             console.log('Server received request: ', call.request);
+            console.log(numCalls++);
             if (!call.request.name) {
                 callback({
                     code: grpc.status.INVALID_ARGUMENT,

@@ -63,6 +63,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var cluster = require('cluster');
+var os = require('os');
 var node_os_1 = require("node:os");
 var node_process_1 = require("node:process");
 var node_worker_threads_1 = require("node:worker_threads");
@@ -71,6 +72,14 @@ var path = __importStar(require("path"));
 var grpc = __importStar(require("@grpc/grpc-js"));
 var protoLoader = __importStar(require("@grpc/proto-loader"));
 var loadTester_1 = __importDefault(require("./loadTester"));
+var genDash_1 = require("../genDash");
+/**
+ * Data Storage Metrics
+ */
+var cpuUsageData = [];
+var eluData = [];
+var totalWorkers = 0;
+var exitedWorkers = 0;
 var readLine = readline.createInterface({ input: node_process_1.stdin, output: node_process_1.stdout });
 var numCPUs = (0, node_os_1.availableParallelism)();
 function inputQuery(label, question, errorMsg) {
@@ -106,14 +115,12 @@ function inputQuery(label, question, errorMsg) {
  * find the pid of the node cluster.js process
  * in console type 'kill -9 <pid>'
  */
-function main() {
+function gatherInputs() {
     return __awaiter(this, void 0, void 0, function () {
-        var numClusters, maxNumberofWorkersPerCluster, numWorkers, numCalls, i, i, worker, PORT, PROTO, packageDef, grpcObj, greeterPackage, client_1, clientInterceptor_1, runStub_1, counter_1, copy_1;
+        var numClusters, maxNumberofWorkersPerCluster, numWorkers, numCalls;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0:
-                    console.log("This is the gRPSeek Load Balance Tester! The tester requires you to input the number of concurrent processes you'd like to run to simulate a grpc server load.");
-                    return [4 /*yield*/, inputQuery("NumClusters", "How many clusters? Recommended Number (Max Number of CPUs): ".concat(numCPUs))];
+                case 0: return [4 /*yield*/, inputQuery("NumClusters", "How many clusters? Recommended Number (Max Number of CPUs): ".concat(numCPUs))];
                 case 1:
                     numClusters = _a.sent();
                     maxNumberofWorkersPerCluster = Math.floor(numCPUs / numClusters);
@@ -123,71 +130,172 @@ function main() {
                     return [4 /*yield*/, inputQuery("NumCalls", "How many calls per thread to the server?")];
                 case 3:
                     numCalls = _a.sent();
-                    //create a client server with num clusters and worker threads on each cluster
-                    if (cluster.isPrimary) {
-                        //Main process - set up cluster workers
-                        console.log("Primary ".concat(process.pid, " is running"));
-                        for (i = 0; i < numClusters; i++) {
-                            cluster.fork();
-                            cluster.on('online', function (worker) {
-                                console.log("worker ".concat(worker.process.pid, " is forked and running"));
-                            });
-                        }
-                        cluster.on('exit', function (worker, code, signal) {
-                            console.log("worker ".concat(worker.process.pid, " died"));
-                        });
-                    }
-                    else {
-                        //Worker Cluster process
-                        if (node_worker_threads_1.isMainThread) {
-                            //Main thread - set up worker threads
-                            for (i = 0; i < numWorkers; i++) {
-                                worker = new node_worker_threads_1.Worker(__filename);
-                                //listen for messages from the worker and errors
-                                worker.on('message', function (msg) { console.log(msg); });
-                                worker.on('exit', function (code) {
-                                    if (code !== 0)
-                                        new Error("Worker stopped with exit code ".concat(code));
-                                });
-                            }
-                        }
-                        else {
-                            PORT = 8082;
-                            PROTO = '../proto/helloworld.proto';
-                            packageDef = protoLoader.loadSync(path.resolve(__dirname, PROTO));
-                            grpcObj = grpc.loadPackageDefinition(packageDef);
-                            greeterPackage = grpcObj.greeterPackage;
-                            client_1 = new grpcObj.greeterPackage.Greeter("0.0.0.0:".concat(PORT), grpc.credentials.createInsecure());
-                            clientInterceptor_1 = new loadTester_1.default();
-                            runStub_1 = function () {
-                                client_1.SayHello({ name: "Kenny" }, { interceptors: [clientInterceptor_1.interceptor] }, function (err, res) {
-                                    if (err) {
-                                        console.log('error', err);
-                                        return;
-                                    }
-                                    console.log("result:", res);
-                                });
-                            };
-                            counter_1 = 0;
-                            copy_1 = function () {
-                                counter_1++;
-                                if (counter_1 < numCalls) {
-                                    setTimeout(function () { copy_1(); }, 1);
-                                }
-                                runStub_1();
-                            };
-                            copy_1();
-                            setTimeout(function () {
-                                console.log('Finished calls: ', clientInterceptor_1.numCalls);
-                                console.log('Number of failed requests: ', clientInterceptor_1.numErrors);
-                            }, 1000);
-                        }
-                        //close the prompt
-                        readLine.close();
-                    }
-                    return [2 /*return*/];
+                    return [2 /*return*/, { numClusters: numClusters, numWorkers: numWorkers, numCalls: numCalls }];
             }
         });
     });
 }
-main();
+function loadT() {
+    return __awaiter(this, void 0, void 0, function () {
+        var _a, numClusters, numWorkers, numCalls, i, numWorkers, numCalls, lastMeasure_1, activeWorkers_1, _loop_1, i, numCalls_1, counter_1, PORT, PROTO, packageDef, grpcObj, greeterPackage, client_1, clientInterceptor_1, runStub_1, copy_1;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    if (!(cluster.isPrimary && node_worker_threads_1.isMainThread)) return [3 /*break*/, 2];
+                    console.log("This is the gRPSeek Load Balance Tester! The tester requires you to input the number of concurrent processes you'd like to run to simulate a grpc server load.");
+                    return [4 /*yield*/, gatherInputs()];
+                case 1:
+                    _a = _b.sent(), numClusters = _a.numClusters, numWorkers = _a.numWorkers, numCalls = _a.numCalls;
+                    //Main process - set up cluster workers
+                    console.log("Primary ".concat(process.pid, " is running"));
+                    for (i = 0; i < numClusters; i++) {
+                        cluster.fork({ numWorkers: numWorkers, numCalls: numCalls });
+                    }
+                    cluster.on('online', function (worker) {
+                        console.log("worker ".concat(worker.process.pid, " is forked and running"));
+                    });
+                    // Initialize total number of worker processes assuming each cluster forks one worker
+                    totalWorkers = numClusters;
+                    cluster.on('exit', function (worker, code, signal) {
+                        console.log("worker ".concat(worker.process.pid, " died"));
+                        exitedWorkers++;
+                        if (exitedWorkers >= totalWorkers) {
+                            var fs = require('fs');
+                            try {
+                                var dashboardHtml = (0, genDash_1.generateGrpcLoadTestDashboard)(cpuUsageData, eluData);
+                                fs.writeFileSync('./dash.html', dashboardHtml);
+                                console.log('Dashboard HTML written successfully');
+                            }
+                            catch (error) {
+                                console.error('Error writing HTML dashboard:', error);
+                            }
+                            // All workers have exited, close readLine and exit
+                            readLine.close();
+                            process.exit(0);
+                        }
+                    });
+                    cluster.on('message', function (worker, message, handle) {
+                        if (message.type === 'CPU') {
+                            cpuUsageData.push({
+                                workerId: message.workerId,
+                                clusterId: message.clusterId,
+                                value: message.data,
+                            });
+                        }
+                        else if (message.type === 'ELU') {
+                            eluData.push({
+                                workerId: message.workerId,
+                                clusterId: message.clusterId,
+                                value: message.data,
+                            });
+                        }
+                    });
+                    return [3 /*break*/, 3];
+                case 2:
+                    numWorkers = process.env.numWorkers
+                        ? parseInt(process.env.numWorkers)
+                        : 1;
+                    numCalls = process.env.numCalls ? parseInt(process.env.numCalls) : 1;
+                    //Worker Cluster process
+                    if (node_worker_threads_1.isMainThread) {
+                        lastMeasure_1 = os.cpus();
+                        activeWorkers_1 = 0;
+                        _loop_1 = function (i) {
+                            activeWorkers_1++;
+                            var worker = new node_worker_threads_1.Worker(__filename, { workerData: { numCalls: numCalls } });
+                            setInterval(function () {
+                                var currentMeasure = os.cpus();
+                                var _loop_2 = function (i_1) {
+                                    var idleDifference = currentMeasure[i_1].times.idle - lastMeasure_1[i_1].times.idle;
+                                    var totalDifference = Object.keys(currentMeasure[i_1].times).reduce(function (total, mode) {
+                                        return (total +
+                                            currentMeasure[i_1].times[mode] -
+                                            lastMeasure_1[i_1].times[mode]);
+                                    }, 0);
+                                    var cpuUsage = (1 - idleDifference / totalDifference) * 100;
+                                    process.send({
+                                        type: 'CPU',
+                                        data: cpuUsage,
+                                        workerId: worker.threadId,
+                                        clusterId: process.pid,
+                                    });
+                                    process.send({
+                                        type: 'ELU',
+                                        data: worker.performance.eventLoopUtilization(),
+                                        workerId: worker.threadId,
+                                        clusterId: process.pid,
+                                    });
+                                    console.log('CPU Usage: ', cpuUsage);
+                                    console.log('ELU: ', worker.performance.eventLoopUtilization());
+                                };
+                                for (var i_1 = 0; i_1 < currentMeasure.length; i_1++) {
+                                    _loop_2(i_1);
+                                }
+                                // Check the worker's usage directly and immediately. The call is thread-safe
+                                // so it doesn't need to wait for the worker's event loop to become free.
+                            }, 100);
+                            //listen for messages from the worker and errors
+                            worker.on('message', function (msg) {
+                                console.log(msg);
+                            });
+                            worker.on('exit', function (code) {
+                                if (code !== 0)
+                                    new Error("Worker stopped with exit code ".concat(code));
+                                activeWorkers_1--;
+                                if (activeWorkers_1 === 0) {
+                                    process.exit(0);
+                                }
+                            });
+                        };
+                        for (i = 0; i < numWorkers; i++) {
+                            _loop_1(i);
+                        }
+                    }
+                    else {
+                        numCalls_1 = node_worker_threads_1.workerData.numCalls;
+                        counter_1 = 0;
+                        PORT = 50051;
+                        PROTO = '../proto/helloworld.proto';
+                        packageDef = protoLoader.loadSync(path.resolve(__dirname, PROTO));
+                        grpcObj = grpc.loadPackageDefinition(packageDef);
+                        greeterPackage = grpcObj.greeterPackage;
+                        client_1 = new grpcObj.greeterPackage.Greeter("0.0.0.0:".concat(PORT), grpc.credentials.createInsecure());
+                        clientInterceptor_1 = new loadTester_1.default();
+                        runStub_1 = function () {
+                            client_1.sayHello({ name: 'Kenny' }, { interceptors: [clientInterceptor_1.interceptor] }, function (err, res) {
+                                if (err) {
+                                    console.log('error', err);
+                                    return;
+                                }
+                                console.log('result:', res);
+                            });
+                        };
+                        copy_1 = function () {
+                            counter_1++;
+                            if (counter_1 < numCalls_1) {
+                                setTimeout(function () {
+                                    copy_1();
+                                }, 1);
+                            }
+                            runStub_1();
+                        };
+                        copy_1();
+                        setTimeout(function () {
+                            console.log('Finished calls: ', clientInterceptor_1.numCalls);
+                            console.log('Number of failed requests: ', clientInterceptor_1.numErrors);
+                            // clientInterceptor.generateHTMLReport();
+                        }, 1000);
+                    }
+                    //close the prompt
+                    readLine.close();
+                    _b.label = 3;
+                case 3: return [2 /*return*/];
+            }
+        });
+    });
+}
+exports.default = loadT;
+loadT().catch(function (err) {
+    console.error('An error occured: ', err);
+    process.exit(1);
+});

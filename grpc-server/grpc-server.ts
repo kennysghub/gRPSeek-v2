@@ -1,13 +1,11 @@
 import * as path from 'path';
-import * as fs from 'fs';
-import * as crypto from 'crypto';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ProtoGrpcType } from '../proto/helloworld';
 import { GreeterHandlers } from '../proto/greeterPackage/Greeter';
 import { addReflection } from 'grpc-server-reflection';
-
-const PORT = 8082;
+let numCalls = 0;
+const PORT = 50051;
 const PROTO_FILE = '../proto/helloworld.proto';
 
 const packageDef = protoLoader.loadSync(path.resolve(__dirname, PROTO_FILE));
@@ -38,7 +36,7 @@ function getServer() {
   server.addService(greeterPackage.Greeter.service, {
     SayHello: (call, callback) => {
       console.log('Server received request: ', call.request);
-
+      console.log(numCalls++);
       if (!call.request.name) {
         callback({
           code: grpc.status.INVALID_ARGUMENT,

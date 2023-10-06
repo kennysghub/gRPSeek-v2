@@ -52,7 +52,6 @@ function repeatCall(call) {
     //   clearTimeout(call.timeout);
     //   return;
     // }
-    console.log('this.latencyData:5 ', clientInterceptor.latencyData);
     // console.log("call.timeout: ", call.timeout)
     if (typeof call.stub === 'function') {
         var instance = new call.stub.constructor();
@@ -62,7 +61,7 @@ function repeatCall(call) {
     call.timeout = setTimeout(function () {
         repeatCall(call);
     }, call.interval);
-    console.log('Prototype of call.stub:', Object.getPrototypeOf(call.stub));
+    // console.log('Prototype of call.stub:', Object.getPrototypeOf(call.stub));
 }
 var LoadTestEngine = /** @class */ (function () {
     function LoadTestEngine(config) {
@@ -74,9 +73,11 @@ var LoadTestEngine = /** @class */ (function () {
         }
     }
     LoadTestEngine.prototype.setupGrpcClient = function () {
+        console.log('Setting up gRPC client...');
         var packageDef = protoLoader.loadSync(path.resolve(__dirname, this.config.protoPath));
         var grpcObj = grpc.loadPackageDefinition(packageDef);
         var Pkg = grpcObj[this.config.packageName];
+        console.log('Pkg: ', Pkg);
         if (!Pkg) {
             throw new Error("Service \"".concat(this.config.serviceName, "\" not found in the loaded .proto file."));
         }
@@ -169,10 +170,7 @@ var LoadTestEngine = /** @class */ (function () {
         var _this = this;
         this.startAll();
         setTimeout(function () {
-            console.log('OPTIONS:kenlog ', exports.options);
-            console.log('this.latencyData:1 ', clientInterceptor.latencyData);
             _this.stopAll();
-            console.log('this.latencyData:2 ', clientInterceptor.latencyData);
         }, this.config.duration * 1000);
     };
     return LoadTestEngine;
