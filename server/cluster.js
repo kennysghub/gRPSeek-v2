@@ -72,7 +72,7 @@ var path = __importStar(require("path"));
 var grpc = __importStar(require("@grpc/grpc-js"));
 var protoLoader = __importStar(require("@grpc/proto-loader"));
 var loadTester_1 = __importDefault(require("./loadTester"));
-var genDash_1 = require("../genDash");
+var genDash_1 = require("../data_visualization/genDash");
 /**
  * Data Storage Metrics
  */

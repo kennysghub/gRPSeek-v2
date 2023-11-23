@@ -14,7 +14,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ProtoGrpcType } from '../proto/helloworld';
 import MetricInterceptor from './loadTester';
-import { generateGrpcLoadTestDashboard } from '../genDash';
+import { generateGrpcLoadTestDashboard } from '../data_visualization/genDash';
 /**
  * Data Storage Metrics
  */
